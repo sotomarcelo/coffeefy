@@ -23,30 +23,10 @@ INSTALLED_APPS = [
 
 
 JAZZMIN_SETTINGS = {
-    "site_title": "CoffeFy Admin ☕",
-    "site_header": "Panel de Administración CoffeFy",
-    "welcome_sign": "Bienvenido al panel de control de CoffeFy",
-    "site_brand": "CoffeFy",
-    "show_sidebar": True,
-    "search_model": ["users.User", "roasteries.Roastery", "rewards.RewardPoint"],
-    "order_with_respect_to": ["users", "roasteries", "rewards"],
-    "icons": {
-        "users.User": "fas fa-user",
-        "roasteries.Roastery": "fas fa-store",
-        "coffee.CoffeeBean": "fas fa-coffee",
-        "rewards.RewardPoint": "fas fa-star",
-        "rewards.RewardProgram": "fas fa-gift",
-        "rewards.RewardRedemption": "fas fa-trophy",
-    },
-    "custom_links": {
-        "roasteries": [{
-            "name": "Ver Mapa",
-            "url": "https://maps.google.com",
-            "icon": "fas fa-map-marker-alt",
-            "permissions": ["auth.view_user"],
-        }]
-    },
-    "show_ui_builder": True,
+    "site_title": "Coffeefy Admin",
+    "site_header": "Coffeefy",
+    "welcome_sign": "Bienvenido al panel de Coffeefy",
+    "site_brand": "Coffeefy",
 }
 
 
@@ -76,6 +56,9 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+            ],
+            'builtins': [
+                'api.templatetags.length_is_compat',
             ],
         },
     },

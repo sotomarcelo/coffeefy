@@ -37,7 +37,7 @@ export async function apiFetch<TResponse>(
   const init: RequestInit = {
     method: options.method ?? "GET",
     headers,
-    credentials: "include",
+    credentials: "same-origin",
   };
 
   if (options.token) {

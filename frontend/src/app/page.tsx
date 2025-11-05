@@ -116,7 +116,10 @@ export default function Home() {
         </Reveal>
       </section>
 
-      <section id="features" className="space-y-12">
+      <section
+        id="features"
+        className="space-y-12 scroll-mt-28 sm:scroll-mt-32"
+      >
         <Reveal className="max-w-2xl space-y-4">
           <h2 className="text-3xl font-semibold text-(--foreground)">
             Todo lo que necesitas para escalar tu experiencia de café
@@ -147,7 +150,7 @@ export default function Home() {
 
       <section
         id="loyalty"
-        className="loyalty-card grid gap-10 rounded-3xl border border-white/50 bg-(--surface) px-6 py-12 shadow-(--shadow-card) sm:grid-cols-[1.1fr_0.9fr] sm:px-12 dark:border-white/10"
+        className="loyalty-card grid gap-10 rounded-3xl border border-white/50 bg-(--surface) px-6 py-12 shadow-(--shadow-card) scroll-mt-28 sm:grid-cols-[1.1fr_0.9fr] sm:px-12 sm:scroll-mt-32 dark:border-white/10"
       >
         <Reveal className="space-y-5">
           <h2 className="text-3xl font-semibold text-(--foreground)">
@@ -202,7 +205,7 @@ export default function Home() {
         </Reveal>
       </section>
 
-      <section id="locals" className="space-y-12">
+      <section id="locals" className="space-y-12 scroll-mt-28 sm:scroll-mt-32">
         <Reveal className="max-w-2xl space-y-4">
           <h2 className="text-3xl font-semibold text-(--foreground)">
             Crea vitrinas para cada local
@@ -247,7 +250,7 @@ export default function Home() {
         as="section"
         id="contact"
         delay={120}
-        className="hover-glow rounded-3xl border border-white/60 bg-(--surface) px-6 py-12 text-center shadow-(--shadow-card) sm:px-12 dark:border-white/10"
+        className="hover-glow rounded-3xl border border-white/60 bg-(--surface) px-6 py-12 text-center shadow-(--shadow-card) scroll-mt-28 sm:px-12 sm:scroll-mt-32 dark:border-white/10"
       >
         <h2 className="text-3xl font-semibold text-(--foreground)">
           ¿Listo para servir la próxima ronda?

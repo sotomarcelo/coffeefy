@@ -18,6 +18,7 @@ from .models import (
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
 
     class Meta:
         model = User

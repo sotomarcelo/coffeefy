@@ -154,7 +154,6 @@ a {
 .floating-card {
   position: relative;
   backdrop-filter: blur(10px);
-  animation: float 16s ease-in-out infinite;
 }
 
 [data-reveal] {

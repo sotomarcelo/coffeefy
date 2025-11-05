@@ -49,7 +49,7 @@ export default function LoginPage() {
               setForm((prev) => ({ ...prev, username: event.target.value }))
             }
             placeholder="barista23"
-            className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-(--foreground) shadow-sm focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30"
+            className="w-full rounded-xl border border-white/60 bg-(--surface) px-4 py-3 text-sm text-(--foreground) shadow-sm transition-colors focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30 dark:border-white/20"
             autoComplete="username"
           />
         </label>
@@ -63,7 +63,7 @@ export default function LoginPage() {
               setForm((prev) => ({ ...prev, password: event.target.value }))
             }
             placeholder="••••••••"
-            className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-(--foreground) shadow-sm focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30"
+            className="w-full rounded-xl border border-white/60 bg-(--surface) px-4 py-3 text-sm text-(--foreground) shadow-sm transition-colors focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30 dark:border-white/20"
             autoComplete="current-password"
           />
         </label>
