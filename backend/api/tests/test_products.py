@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 from django.contrib.auth import get_user_model
-from api.models import Local, Product
+from api.models import Local, Product, ProductCategory
 
 User = get_user_model()
 
@@ -22,12 +22,17 @@ def test_create_product_requires_auth_and_local():
 
     client.force_authenticate(user=owner)
 
+    bebidas, _ = ProductCategory.objects.get_or_create(
+        slug="bebida",
+        defaults={"name": "Bebidas", "tracks_stock": False},
+    )
+
     data = {
         "local": local.id,
         "name": "Latte Doble",
         "description": "Latte con doble shot",
         "price": "3500.00",
-        "product_type": "bebida",
+        "category": bebidas.id,
         "state": "normal",
     }
 
@@ -38,7 +43,8 @@ def test_create_product_requires_auth_and_local():
 
     product = Product.objects.get(id=response.data["id"])
     assert product.local == local
-    assert product.product_type == Product.Types.BEVERAGE
+    assert product.category == bebidas
+    assert product.category.tracks_stock is False
 
 
 @pytest.mark.django_db
@@ -57,13 +63,18 @@ def test_grain_product_requires_stock():
 
     client.force_authenticate(user=owner)
 
+    granos, _ = ProductCategory.objects.get_or_create(
+        slug="grano",
+        defaults={"name": "Granos", "tracks_stock": True},
+    )
+
     response = client.post(
         "/api/products/",
         {
             "local": local.id,
             "name": "Grano Etiopía",
             "price": "8500.00",
-            "product_type": "grano",
+            "category": granos.id,
             "state": "recien_tostado",
         },
         format="json",
@@ -78,7 +89,7 @@ def test_grain_product_requires_stock():
             "local": local.id,
             "name": "Grano Colombia",
             "price": "9000.00",
-            "product_type": "grano",
+            "category": granos.id,
             "state": "normal",
             "stock": 15,
         },

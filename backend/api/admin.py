@@ -4,6 +4,7 @@ from .models import (
     User,
     Local,
     Product,
+    ProductCategory,
     Order,
     OrderItem,
     Reward,
@@ -26,11 +27,18 @@ class LocalAdmin(admin.ModelAdmin):
     search_fields = ("name", "owner__username", "address")
     readonly_fields = ("created_at", "updated_at")
 
+@admin.register(ProductCategory)
+class ProductCategoryAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "local", "tracks_stock", "created_at")
+    list_filter = ("tracks_stock", "local")
+    search_fields = ("name", "local__name")
+    readonly_fields = ("created_at", "updated_at")
+
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "local", "product_type", "price", "stock", "state", "is_active")
-    list_filter = ("product_type", "state", "is_active", "local")
+    list_display = ("id", "name", "local", "category", "price", "stock", "state", "is_active")
+    list_filter = ("category", "state", "is_active", "local")
     search_fields = ("name", "local__name")
     readonly_fields = ("created_at", "updated_at")
 

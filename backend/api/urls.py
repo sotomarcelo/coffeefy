@@ -4,6 +4,8 @@ from .views import (
 	UserViewSet,
 	LocalViewSet,
 	ProductViewSet,
+	ProductCategoryViewSet,
+	NotificationViewSet,
 	OrderViewSet,
 	OrderItemViewSet,
 	RewardViewSet,
@@ -15,6 +17,8 @@ router = DefaultRouter()
 router.register(r"users", UserViewSet)
 router.register(r"locals", LocalViewSet)
 router.register(r"products", ProductViewSet)
+router.register(r"categories", ProductCategoryViewSet)
+router.register(r"notifications", NotificationViewSet, basename="notifications")
 router.register(r"orders", OrderViewSet)
 router.register(r"order-items", OrderItemViewSet, basename="order-items")
 router.register(r"rewards", RewardViewSet)

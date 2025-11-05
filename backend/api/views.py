@@ -1,4 +1,7 @@
-from rest_framework import permissions, viewsets
+from django.db import transaction
+from django.db.models import F, Q
+from django.utils import timezone
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -6,21 +9,25 @@ from .models import (
     User,
     Local,
     Product,
+    ProductCategory,
     Order,
     OrderItem,
     Reward,
     PointBalance,
     Redemption,
+    Notification,
 )
 from .serializers import (
     UserSerializer,
     LocalSerializer,
     ProductSerializer,
+    ProductCategorySerializer,
     OrderSerializer,
     OrderItemReadSerializer,
     RewardSerializer,
     PointBalanceSerializer,
     RedemptionSerializer,
+    NotificationSerializer,
 )
 
 
@@ -42,9 +49,154 @@ class LocalViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related("local").all()
+    queryset = Product.objects.select_related("local", "category").all()
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        params = self.request.query_params
+
+        search = params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search)
+                | Q(description__icontains=search)
+                | Q(category__name__icontains=search)
+            )
+
+        category_id = params.get("category")
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+
+        local_id = params.get("local")
+        if local_id:
+            queryset = queryset.filter(local_id=local_id)
+
+        stock_state = params.get("stock_state")
+        if stock_state:
+            state_filter = self._build_stock_state_filter(stock_state)
+            if state_filter is not None:
+                queryset = queryset.filter(state_filter)
+
+        in_stock = params.get("in_stock")
+        if in_stock:
+            if in_stock.lower() == "true":
+                queryset = queryset.filter(in_stock=True)
+            elif in_stock.lower() == "false":
+                queryset = queryset.filter(in_stock=False)
+
+        ordering = params.get("ordering")
+        if ordering:
+            queryset = queryset.order_by(*ordering.split(","))
+        else:
+            queryset = queryset.order_by("category_id", "display_order", "name")
+
+        return queryset
+
+    @staticmethod
+    def _build_stock_state_filter(value: str):
+        state = value.lower()
+        if state == "low":
+            return (
+                Q(tracks_stock=True)
+                & Q(stock__gt=F("critical_stock_threshold"))
+                & Q(stock__lte=F("low_stock_threshold"))
+                & Q(stock__gt=0)
+            )
+        if state == "critical":
+            return (
+                Q(tracks_stock=True)
+                & Q(stock__gt=0)
+                & Q(stock__lte=F("critical_stock_threshold"))
+            )
+        if state == "out":
+            return (
+                Q(tracks_stock=True, stock__lte=0)
+                | Q(tracks_stock=False, in_stock=False)
+            )
+        if state == "available":
+            return Q(tracks_stock=False, in_stock=True)
+        if state == "normal":
+            return (
+                Q(tracks_stock=True)
+                & Q(stock__gt=F("low_stock_threshold"))
+            )
+        return None
+
+    @action(detail=False, methods=["post"], permission_classes=[permissions.IsAuthenticated], url_path="reorder")
+    def reorder(self, request):
+        category_id = request.data.get("category")
+        order = request.data.get("order", [])
+
+        if not category_id:
+            return Response({"detail": "category es obligatorio."}, status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(order, list) or not all(isinstance(item, int) for item in order):
+            return Response({"detail": "order debe ser una lista de IDs numéricos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        products = Product.objects.filter(category_id=category_id, id__in=order)
+        if products.count() != len(order):
+            return Response({"detail": "Algunos productos no pertenecen a la categoría indicada."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            for index, product_id in enumerate(order):
+                Product.objects.filter(id=product_id).update(display_order=index)
+
+        return Response({"detail": "Orden actualizado."}, status=status.HTTP_200_OK)
+
+
+class ProductCategoryViewSet(viewsets.ModelViewSet):
+    queryset = ProductCategory.objects.select_related("local").all()
+    serializer_class = ProductCategorySerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        local_id = self.request.query_params.get("local")
+        include_global = self.request.query_params.get("include_global", "true").lower() != "false"
+
+        if local_id:
+            filters = Q(local_id=local_id)
+            if include_global:
+                filters = filters | Q(local__isnull=True)
+            queryset = queryset.filter(filters)
+        elif self.request.user.is_authenticated:
+            user_local_ids = Local.objects.filter(owner=self.request.user).values_list("id", flat=True)
+            queryset = queryset.filter(Q(local__isnull=True) | Q(local_id__in=user_local_ids))
+        else:
+            queryset = queryset.filter(local__isnull=True)
+
+        return queryset
+
+
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        base_queryset = Notification.objects.select_related("product", "local").order_by("-created_at")
+        user = self.request.user
+        if not user.is_authenticated:
+            return Notification.objects.none()
+
+        if user.is_superuser or getattr(user, "role", None) == User.Roles.ADMIN:
+            return base_queryset
+
+        local_ids = Local.objects.filter(owner=user).values_list("id", flat=True)
+        return base_queryset.filter(Q(local_id__in=local_ids) | Q(user=user))
+
+    @action(detail=True, methods=["post"])
+    def mark_read(self, request, pk=None):
+        notification = self.get_object()
+        notification.mark_as_read()
+        serializer = self.get_serializer(notification)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], url_path="mark-all-read")
+    def mark_all_read(self, request):
+        queryset = self.get_queryset().filter(is_read=False)
+        updated = queryset.update(is_read=True, read_at=timezone.now())
+        return Response({"updated": updated})
 
 
 class OrderViewSet(viewsets.ModelViewSet):

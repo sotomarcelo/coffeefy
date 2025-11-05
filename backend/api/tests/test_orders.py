@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 from django.contrib.auth import get_user_model
-from api.models import Local, Product, Order
+from api.models import Local, Product, ProductCategory, Order
 
 User = get_user_model()
 
@@ -20,12 +20,17 @@ def test_client_can_place_order():
         type="cafeteria",
         points_rate=0.05,
     )
+    bebidas, _ = ProductCategory.objects.get_or_create(
+        slug="bebida",
+        defaults={"name": "Bebidas", "tracks_stock": False},
+    )
+
     product = Product.objects.create(
         local=local,
         name="Capuccino",
         description="Espuma sedosa",
         price="3000.00",
-        product_type="bebida",
+        category=bebidas,
         state="normal",
     )
 
