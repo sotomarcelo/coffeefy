@@ -8,6 +8,7 @@ import { ROLE_CONFIG, ROLE_LABELS, RoleKey } from "./config";
 
 const BASE_NAVIGATION = [
   { label: "Resumen", href: "/dashboard" },
+  { label: "Perfil del local", href: "/dashboard/local" },
   { label: "Catálogo", href: "/dashboard/productos" },
   { label: "Operaciones", href: "/dashboard/pedidos" },
   { label: "Lealtad", href: "/dashboard/puntos" },

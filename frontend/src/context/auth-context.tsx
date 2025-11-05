@@ -107,13 +107,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
         const found = data.find((item) => item.username === username);
         if (found) {
-          const enriched = { username: found.username, role: found.role };
+          const enriched: AuthUser = {
+            username: found.username,
+            role: found.role,
+          };
           setUser(enriched);
           persist(authTokens, enriched);
+          return enriched;
         }
       } catch (profileError) {
         console.error("No se pudo cargar el perfil del usuario", profileError);
       }
+      return null;
     },
     [persist]
   );
@@ -132,8 +137,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const baseUser: AuthUser = { username: credentials.username };
         setUser(baseUser);
         persist(tokenResponse, baseUser);
-        router.push("/dashboard");
-        await loadUserProfile(tokenResponse, credentials.username);
+
+        let targetRole: string | undefined = baseUser.role;
+        const loadedProfile = await loadUserProfile(
+          tokenResponse,
+          credentials.username
+        );
+        if (loadedProfile?.role) {
+          targetRole = loadedProfile.role;
+        }
+
+        const destination =
+          targetRole === "cliente" ? "/cliente" : "/dashboard";
+        router.push(destination);
       } catch (err) {
         if (err instanceof ApiError) {
           setError(

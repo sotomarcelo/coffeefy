@@ -7,6 +7,7 @@ from rest_framework import serializers
 from .models import (
     User,
     Local,
+    Tag,
     Product,
     ProductCategory,
     Order,
@@ -49,9 +50,29 @@ class UserSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "description",
+            "icon",
+            "scope",
+            "accent_color",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ("slug", "created_at", "updated_at")
+
 
 class LocalSerializer(serializers.ModelSerializer):
     owner_name = serializers.ReadOnlyField(source="owner.username")
+    tags = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Tag.objects.all(), required=False
+    )
+    tag_details = TagSerializer(source="tags", many=True, read_only=True)
 
     class Meta:
         model = Local
@@ -61,14 +82,66 @@ class LocalSerializer(serializers.ModelSerializer):
             "owner_name",
             "name",
             "description",
+            "headline",
+            "highlights",
             "address",
             "schedule",
+            "opening_hours",
+            "special_hours",
+            "timezone",
             "type",
             "points_rate",
             "qr_code_url",
+            "contact_phone",
+            "contact_email",
+            "whatsapp_number",
+            "website_url",
+            "reservation_url",
+            "facebook_url",
+            "instagram_url",
+            "tiktok_url",
+            "map_url",
+            "map_embed_code",
+            "latitude",
+            "longitude",
+            "wifi_network",
+            "wifi_password",
+            "amenities_note",
+            "cover_image_url",
+            "gallery_urls",
+            "tags",
+            "tag_details",
             "created_at",
             "updated_at",
         ]
+        read_only_fields = ("owner_name", "created_at", "updated_at")
+        extra_kwargs = {
+            "schedule": {"required": False, "allow_blank": True},
+            "description": {"required": False, "allow_blank": True},
+            "headline": {"required": False, "allow_blank": True},
+            "highlights": {"required": False, "allow_blank": True},
+            "opening_hours": {"required": False},
+            "special_hours": {"required": False},
+            "timezone": {"required": False, "allow_blank": True},
+            "contact_phone": {"required": False, "allow_blank": True},
+            "contact_email": {"required": False, "allow_blank": True},
+            "whatsapp_number": {"required": False, "allow_blank": True},
+            "website_url": {"required": False, "allow_blank": True},
+            "reservation_url": {"required": False, "allow_blank": True},
+            "facebook_url": {"required": False, "allow_blank": True},
+            "instagram_url": {"required": False, "allow_blank": True},
+            "tiktok_url": {"required": False, "allow_blank": True},
+            "map_url": {"required": False, "allow_blank": True},
+            "map_embed_code": {"required": False, "allow_blank": True},
+            "latitude": {"required": False, "allow_null": True},
+            "longitude": {"required": False, "allow_null": True},
+            "wifi_network": {"required": False, "allow_blank": True},
+            "wifi_password": {"required": False, "allow_blank": True},
+            "amenities_note": {"required": False, "allow_blank": True},
+            "cover_image_url": {"required": False, "allow_blank": True},
+            "gallery_urls": {"required": False},
+            "tags": {"required": False},
+        }
 
 class ProductCategorySerializer(serializers.ModelSerializer):
     local_name = serializers.ReadOnlyField(source="local.name")
@@ -121,6 +194,10 @@ class ProductSerializer(serializers.ModelSerializer):
     category_slug = serializers.ReadOnlyField(source="category.slug")
     category_tracks_stock = serializers.ReadOnlyField(source="category.tracks_stock")
     stock_state = serializers.CharField(read_only=True)
+    tags = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Tag.objects.all(), required=False
+    )
+    tag_details = TagSerializer(source="tags", many=True, read_only=True)
 
     class Meta:
         model = Product
@@ -145,6 +222,8 @@ class ProductSerializer(serializers.ModelSerializer):
             "state",
             "is_active",
             "image_url",
+            "tags",
+            "tag_details",
             "created_at",
             "updated_at",
         ]
@@ -154,6 +233,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "category_slug",
             "category_tracks_stock",
             "stock_state",
+            "tag_details",
             "created_at",
             "updated_at",
         )
@@ -277,6 +357,8 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemReadSerializer(many=True, read_only=True)
     items_data = OrderItemWriteSerializer(many=True, write_only=True)
     user_name = serializers.ReadOnlyField(source="user.username")
+    local_name = serializers.ReadOnlyField(source="local.name")
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
         model = Order
@@ -284,7 +366,9 @@ class OrderSerializer(serializers.ModelSerializer):
             "id",
             "user_name",
             "local",
+            "local_name",
             "status",
+            "status_display",
             "total",
             "pickup_code",
             "created_at",
@@ -292,7 +376,16 @@ class OrderSerializer(serializers.ModelSerializer):
             "items",
             "items_data",
         ]
-        read_only_fields = ("status", "total", "pickup_code", "created_at", "updated_at")
+        read_only_fields = (
+            "status",
+            "status_display",
+            "total",
+            "pickup_code",
+            "created_at",
+            "updated_at",
+            "local_name",
+            "user_name",
+        )
 
     def create(self, validated_data):
         items_data = validated_data.pop("items_data")
@@ -314,6 +407,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class RewardSerializer(serializers.ModelSerializer):
     local_name = serializers.ReadOnlyField(source="local.name")
+    redemption_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Reward
@@ -326,6 +420,7 @@ class RewardSerializer(serializers.ModelSerializer):
             "points_required",
             "image_url",
             "active",
+            "redemption_count",
             "created_at",
             "updated_at",
         ]
@@ -333,16 +428,26 @@ class RewardSerializer(serializers.ModelSerializer):
 
 class PointBalanceSerializer(serializers.ModelSerializer):
     local_name = serializers.ReadOnlyField(source="local.name")
+    user_name = serializers.ReadOnlyField(source="user.username")
 
     class Meta:
         model = PointBalance
-        fields = ["id", "user", "local", "local_name", "total", "updated_at"]
+        fields = [
+            "id",
+            "user",
+            "user_name",
+            "local",
+            "local_name",
+            "total",
+            "updated_at",
+        ]
         read_only_fields = ("updated_at",)
 
 
 class RedemptionSerializer(serializers.ModelSerializer):
     local_name = serializers.ReadOnlyField(source="local.name")
     reward_name = serializers.ReadOnlyField(source="reward.name")
+    user_name = serializers.ReadOnlyField(source="user.username")
 
     class Meta:
         model = Redemption
@@ -355,6 +460,7 @@ class RedemptionSerializer(serializers.ModelSerializer):
             "points_used",
             "local_name",
             "reward_name",
+            "user_name",
             "created_at",
         ]
         read_only_fields = ("created_at",)

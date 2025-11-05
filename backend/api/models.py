@@ -35,11 +35,34 @@ class Local(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="locales")
     name = models.CharField(max_length=120)
     description = models.TextField(blank=True)
+    headline = models.CharField(max_length=160, blank=True)
+    highlights = models.TextField(blank=True)
     address = models.CharField(max_length=200)
     schedule = models.CharField(max_length=200, blank=True)
+    opening_hours = models.JSONField(default=dict, blank=True)
+    special_hours = models.JSONField(default=list, blank=True)
+    timezone = models.CharField(max_length=64, blank=True)
     type = models.CharField(max_length=20, choices=Types.choices, default=Types.CAFE)
     points_rate = models.FloatField(default=0.001, validators=[MinValueValidator(0)])
     qr_code_url = models.URLField(blank=True, null=True)
+    contact_phone = models.CharField(max_length=32, blank=True)
+    contact_email = models.EmailField(blank=True)
+    whatsapp_number = models.CharField(max_length=32, blank=True)
+    website_url = models.URLField(blank=True)
+    reservation_url = models.URLField(blank=True)
+    facebook_url = models.URLField(blank=True)
+    instagram_url = models.URLField(blank=True)
+    tiktok_url = models.URLField(blank=True)
+    map_url = models.URLField(blank=True)
+    map_embed_code = models.TextField(blank=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    wifi_network = models.CharField(max_length=64, blank=True)
+    wifi_password = models.CharField(max_length=64, blank=True)
+    amenities_note = models.TextField(blank=True)
+    tags = models.ManyToManyField("Tag", related_name="locals", blank=True)
+    cover_image_url = models.URLField(blank=True)
+    gallery_urls = models.JSONField(default=list, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -53,6 +76,39 @@ class Local(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.get_type_display()})"
+
+
+class Tag(models.Model):
+    class Scopes(models.TextChoices):
+        GENERAL = "general", "General"
+        PRODUCT = "product", "Producto"
+        LOCAL = "local", "Local"
+
+    name = models.CharField(max_length=80)
+    slug = models.SlugField(max_length=120, unique=True)
+    description = models.CharField(max_length=200, blank=True)
+    icon = models.CharField(max_length=40, blank=True)
+    scope = models.CharField(max_length=20, choices=Scopes.choices, default=Scopes.GENERAL)
+    accent_color = models.CharField(max_length=12, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.name) or "etiqueta"
+            slug = base_slug
+            index = 1
+            while Tag.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                index += 1
+                slug = f"{base_slug}-{index}"
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 
 class ProductCategory(models.Model):
@@ -112,6 +168,7 @@ class Product(models.Model):
     state = models.CharField(max_length=20, choices=States.choices, default=States.STANDARD)
     is_active = models.BooleanField(default=True)
     image_url = models.URLField(blank=True, null=True)
+    tags = models.ManyToManyField("Tag", related_name="products", blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

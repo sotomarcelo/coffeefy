@@ -12,12 +12,42 @@ import { useAuth } from "@/hooks/use-auth";
 import { Reveal } from "@/components/reveal";
 import { apiFetch, ApiError } from "@/lib/api";
 
+type Tag = {
+  id: number;
+  name: string;
+  slug: string;
+  scope: "general" | "product" | "local";
+  description?: string;
+  icon?: string;
+  accent_color?: string;
+};
+
 type Local = {
   id: number;
   name: string;
   owner: number;
   owner_name: string;
   type: string;
+  headline?: string;
+  highlights?: string;
+  description?: string;
+  address?: string;
+  schedule?: string;
+  opening_hours?: Record<string, unknown> | null;
+  contact_phone?: string;
+  contact_email?: string;
+  whatsapp_number?: string;
+  website_url?: string;
+  reservation_url?: string;
+  facebook_url?: string;
+  instagram_url?: string;
+  tiktok_url?: string;
+  map_url?: string;
+  map_embed_code?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  tags?: number[];
+  tag_details?: Tag[];
 };
 
 type ProductCategory = {
@@ -55,6 +85,8 @@ type Product = {
   state: string;
   is_active: boolean;
   image_url: string | null;
+  tags?: number[];
+  tag_details?: Tag[];
   created_at: string;
   updated_at: string;
 };
@@ -96,6 +128,7 @@ type ProductFormState = {
   criticalStockThreshold: string;
   state: keyof typeof PRODUCT_STATES;
   image_url: string;
+  tagIds: number[];
 };
 
 type CategoryFormState = {
@@ -116,6 +149,7 @@ const EMPTY_FORM: ProductFormState = {
   criticalStockThreshold: "0",
   state: "normal",
   image_url: "",
+  tagIds: [],
 };
 
 const EMPTY_CATEGORY_FORM: CategoryFormState = {
@@ -148,6 +182,10 @@ export default function CatalogPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"all" | number>("all");
   const productTableRef = useRef<HTMLDivElement | null>(null);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [newTagName, setNewTagName] = useState("");
+  const [tagSaving, setTagSaving] = useState(false);
+  const [tagError, setTagError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user || !accessToken) {
@@ -159,21 +197,31 @@ export default function CatalogPage() {
       setLoading(true);
       setError(null);
       try {
-        const [localsResponse, productsResponse, categoriesResponse] =
-          await Promise.all([
-            apiFetch<Local[]>("/api/locals/", {
-              token: accessToken ?? undefined,
-            }),
-            apiFetch<Product[]>("/api/products/", {
-              token: accessToken ?? undefined,
-            }),
-            apiFetch<ProductCategory[]>("/api/categories/", {
-              token: accessToken ?? undefined,
-            }),
-          ]);
+        const [
+          localsResponse,
+          productsResponse,
+          categoriesResponse,
+          tagsResponse,
+        ] = await Promise.all([
+          apiFetch<Local[]>("/api/locals/", {
+            token: accessToken ?? undefined,
+          }),
+          apiFetch<Product[]>("/api/products/", {
+            token: accessToken ?? undefined,
+          }),
+          apiFetch<ProductCategory[]>("/api/categories/", {
+            token: accessToken ?? undefined,
+          }),
+          apiFetch<Tag[]>("/api/tags/?scope=product", {
+            token: accessToken ?? undefined,
+          }),
+        ]);
         setLocals(localsResponse);
         setProducts(productsResponse);
         setCategories(categoriesResponse);
+        setAvailableTags(
+          [...tagsResponse].sort((a, b) => a.name.localeCompare(b.name))
+        );
       } catch (err) {
         console.error(err);
         setError(
@@ -301,10 +349,18 @@ export default function CatalogPage() {
   const handleRefreshProducts = useCallback(async () => {
     if (!user || !accessToken) return;
     try {
-      const data = await apiFetch<Product[]>("/api/products/", {
-        token: accessToken ?? undefined,
-      });
-      setProducts(data);
+      const [productsResponse, tagsResponse] = await Promise.all([
+        apiFetch<Product[]>("/api/products/", {
+          token: accessToken ?? undefined,
+        }),
+        apiFetch<Tag[]>("/api/tags/?scope=product", {
+          token: accessToken ?? undefined,
+        }),
+      ]);
+      setProducts(productsResponse);
+      setAvailableTags(
+        [...tagsResponse].sort((a, b) => a.name.localeCompare(b.name))
+      );
     } catch (err) {
       console.error(err);
       setError("No pudimos actualizar la lista de productos.");
@@ -502,6 +558,7 @@ export default function CatalogPage() {
       local: Number(form.localId),
       image_url: form.image_url?.trim() || null,
       tracks_stock: form.tracksStock,
+      tags: form.tagIds,
     };
 
     if (!editingProduct) {
@@ -599,6 +656,10 @@ export default function CatalogPage() {
       criticalStockThreshold: String(product.critical_stock_threshold ?? 0),
       state: product.state as ProductFormState["state"],
       image_url: product.image_url ?? "",
+      tagIds:
+        Array.isArray(product.tags) && product.tags.length > 0
+          ? product.tags
+          : product.tag_details?.map((tag) => tag.id) ?? [],
     });
   }, []);
 
@@ -674,6 +735,51 @@ export default function CatalogPage() {
     [accessToken, handleRefreshProducts]
   );
 
+  const handleToggleTag = useCallback((tagId: number) => {
+    setForm((prev) => {
+      const exists = prev.tagIds.includes(tagId);
+      const nextTagIds = exists
+        ? prev.tagIds.filter((id) => id !== tagId)
+        : [...prev.tagIds, tagId];
+      return { ...prev, tagIds: nextTagIds };
+    });
+  }, []);
+
+  const handleCreateTag = useCallback(async () => {
+    const name = newTagName.trim();
+    if (!name || !accessToken) {
+      return;
+    }
+    setTagSaving(true);
+    setTagError(null);
+    try {
+      const created = await apiFetch<Tag>("/api/tags/", {
+        method: "POST",
+        token: accessToken ?? undefined,
+        body: { name, scope: "product" },
+      });
+      setAvailableTags((prev) =>
+        [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setForm((prev) =>
+        prev.tagIds.includes(created.id)
+          ? prev
+          : { ...prev, tagIds: [...prev.tagIds, created.id] }
+      );
+      setNewTagName("");
+    } catch (err) {
+      const message =
+        err instanceof ApiError && err.details
+          ? typeof err.details === "string"
+            ? err.details
+            : "No pudimos crear la etiqueta."
+          : "No pudimos crear la etiqueta.";
+      setTagError(message);
+    } finally {
+      setTagSaving(false);
+    }
+  }, [newTagName, accessToken]);
+
   const columns = useMemo<ColumnDef<Product>[]>(
     () => [
       columnHelper.display({
@@ -682,16 +788,38 @@ export default function CatalogPage() {
         enableResizing: true,
         size: 260,
         minSize: 200,
-        cell: ({ row }) => (
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-(--foreground)">
-              {row.original.name}
-            </span>
-            <span className="text-xs text-(--muted-foreground)">
-              {row.original.description || "Sin descripción"}
-            </span>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const product = row.original;
+          const resolvedTags = product.tag_details?.length
+            ? product.tag_details
+            : Array.isArray(product.tags)
+            ? product.tags
+                .map((id) => availableTags.find((tag) => tag.id === id) ?? null)
+                .filter((tag): tag is Tag => Boolean(tag))
+            : [];
+          return (
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-(--foreground)">
+                {product.name}
+              </span>
+              <span className="text-xs text-(--muted-foreground)">
+                {product.description || "Sin descripción"}
+              </span>
+              {resolvedTags.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {resolvedTags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="rounded-full bg-(--surface-alt) px-2 py-0.5 text-[11px] font-semibold text-(--muted-foreground)"
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        },
       }),
       columnHelper.display({
         id: "category",
@@ -842,6 +970,7 @@ export default function CatalogPage() {
       handleStockAdjust,
       handleToggleAvailability,
       updatingProductId,
+      availableTags,
     ]
   );
 
@@ -1171,6 +1300,73 @@ export default function CatalogPage() {
                 className="mt-1 h-24 w-full rounded-xl border border-white/40 bg-(--surface) px-4 py-3 text-sm text-(--foreground) shadow-sm focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30"
               />
             </label>
+
+            <div className="rounded-2xl border border-white/10 bg-(--surface) p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-(--foreground)">
+                  Etiquetas
+                </p>
+                {tagError ? (
+                  <span className="text-xs text-red-500">{tagError}</span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-xs text-(--muted-foreground)">
+                Usa etiquetas como “Sin gluten”, “Veggie” o “Edición limitada”
+                para filtrar y destacar productos.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {availableTags.length === 0 ? (
+                  <span className="text-xs text-(--muted-foreground)">
+                    Aún no tienes etiquetas. Crea la primera abajo.
+                  </span>
+                ) : (
+                  availableTags.map((tag) => {
+                    const isActive = form.tagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => handleToggleTag(tag.id)}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                          isActive
+                            ? "border-(--accent) bg-(--accent) text-white"
+                            : "border-white/20 text-(--muted-foreground) hover:border-(--accent) hover:text-(--accent)"
+                        }`}
+                      >
+                        {tag.name}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={newTagName}
+                  onChange={(event) => {
+                    setNewTagName(event.target.value);
+                    if (tagError) {
+                      setTagError(null);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleCreateTag();
+                    }
+                  }}
+                  placeholder="Nombre de la etiqueta"
+                  className="flex-1 rounded-xl border border-white/30 bg-(--surface-alt) px-4 py-2 text-sm text-(--foreground) shadow-sm focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30"
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateTag}
+                  disabled={tagSaving || !newTagName.trim()}
+                  className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-(--muted-foreground) transition hover:border-(--accent) hover:text-(--accent) disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {tagSaving ? "Creando…" : "Crear etiqueta"}
+                </button>
+              </div>
+            </div>
 
             <div
               className="grid gap-4 sm:grid-cols-[1fr_1fr_1fr]

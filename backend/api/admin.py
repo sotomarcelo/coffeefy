@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     User,
     Local,
+    Tag,
     Product,
     ProductCategory,
     Order,
@@ -25,6 +26,14 @@ class LocalAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "type", "owner", "points_rate", "created_at")
     list_filter = ("type", "points_rate")
     search_fields = ("name", "owner__username", "address")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "scope", "created_at")
+    list_filter = ("scope",)
+    search_fields = ("name", "slug")
     readonly_fields = ("created_at", "updated_at")
 
 @admin.register(ProductCategory)
