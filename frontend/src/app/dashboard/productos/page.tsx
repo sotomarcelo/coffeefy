@@ -1,6 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import type { ColumnDef } from "@tanstack/react-table";
 import { useAuth } from "@/hooks/use-auth";
 import { Reveal } from "@/components/reveal";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -73,6 +80,8 @@ const STOCK_BADGE_CLASSES: Record<StockState, string> = {
   critical: "bg-red-100 text-red-700",
   out: "bg-red-200 text-red-800",
 };
+
+const columnHelper = createColumnHelper<Product>();
 
 type ProductFormState = {
   name: string;
@@ -289,7 +298,7 @@ export default function CatalogPage() {
     }
   }, [form.tracksStock, form.stock, form.inStock]);
 
-  const handleRefreshProducts = async () => {
+  const handleRefreshProducts = useCallback(async () => {
     if (!user || !accessToken) return;
     try {
       const data = await apiFetch<Product[]>("/api/products/", {
@@ -300,9 +309,9 @@ export default function CatalogPage() {
       console.error(err);
       setError("No pudimos actualizar la lista de productos.");
     }
-  };
+  }, [user, accessToken]);
 
-  const handleRefreshCategories = async () => {
+  const handleRefreshCategories = useCallback(async () => {
     if (!user || !accessToken) return;
     try {
       const data = await apiFetch<ProductCategory[]>("/api/categories/", {
@@ -313,7 +322,7 @@ export default function CatalogPage() {
       console.error(err);
       setError("No pudimos actualizar las categorías.");
     }
-  };
+  }, [user, accessToken]);
 
   const handleFormChange = <K extends keyof ProductFormState>(
     field: K,
@@ -572,7 +581,7 @@ export default function CatalogPage() {
     }
   };
 
-  const handleEditProduct = (product: Product) => {
+  const handleEditProduct = useCallback((product: Product) => {
     setError(null);
     setEditingProduct(product);
     setShowForm(true);
@@ -591,70 +600,260 @@ export default function CatalogPage() {
       state: product.state as ProductFormState["state"],
       image_url: product.image_url ?? "",
     });
-  };
+  }, []);
 
-  const handleToggleActive = async (product: Product) => {
-    if (!accessToken) return;
-    setUpdatingProductId(product.id);
-    setError(null);
-    try {
-      await apiFetch<Product>(`/api/products/${product.id}/`, {
-        method: "PATCH",
-        token: accessToken ?? undefined,
-        body: { is_active: !product.is_active },
-      });
-      await handleRefreshProducts();
-    } catch (err) {
-      console.error(err);
-      setError("No pudimos actualizar el estado del producto.");
-    } finally {
-      setUpdatingProductId(null);
-    }
-  };
+  const handleToggleActive = useCallback(
+    async (product: Product) => {
+      if (!accessToken) return;
+      setUpdatingProductId(product.id);
+      setError(null);
+      try {
+        await apiFetch<Product>(`/api/products/${product.id}/`, {
+          method: "PATCH",
+          token: accessToken ?? undefined,
+          body: { is_active: !product.is_active },
+        });
+        await handleRefreshProducts();
+      } catch (err) {
+        console.error(err);
+        setError("No pudimos actualizar el estado del producto.");
+      } finally {
+        setUpdatingProductId(null);
+      }
+    },
+    [accessToken, handleRefreshProducts]
+  );
 
-  const handleStockAdjust = async (product: Product, delta: number) => {
-    if (!product.tracks_stock) return;
-    if (!accessToken) return;
-    const current = product.stock;
-    const next = current + delta;
-    if (next < 0) return;
+  const handleStockAdjust = useCallback(
+    async (product: Product, delta: number) => {
+      if (!product.tracks_stock) return;
+      if (!accessToken) return;
+      const current = product.stock;
+      const next = current + delta;
+      if (next < 0) return;
 
-    setUpdatingProductId(product.id);
-    setError(null);
-    try {
-      await apiFetch<Product>(`/api/products/${product.id}/`, {
-        method: "PATCH",
-        token: accessToken ?? undefined,
-        body: { stock: next },
-      });
-      await handleRefreshProducts();
-    } catch (err) {
-      console.error(err);
-      setError("No pudimos ajustar el stock. Intenta nuevamente.");
-    } finally {
-      setUpdatingProductId(null);
-    }
-  };
+      setUpdatingProductId(product.id);
+      setError(null);
+      try {
+        await apiFetch<Product>(`/api/products/${product.id}/`, {
+          method: "PATCH",
+          token: accessToken ?? undefined,
+          body: { stock: next },
+        });
+        await handleRefreshProducts();
+      } catch (err) {
+        console.error(err);
+        setError("No pudimos ajustar el stock. Intenta nuevamente.");
+      } finally {
+        setUpdatingProductId(null);
+      }
+    },
+    [accessToken, handleRefreshProducts]
+  );
 
-  const handleToggleAvailability = async (product: Product) => {
-    if (product.tracks_stock) return;
-    if (!accessToken) return;
-    setUpdatingProductId(product.id);
-    setError(null);
-    try {
-      await apiFetch<Product>(`/api/products/${product.id}/`, {
-        method: "PATCH",
-        token: accessToken ?? undefined,
-        body: { in_stock: !product.in_stock },
-      });
-      await handleRefreshProducts();
-    } catch (err) {
-      console.error(err);
-      setError("No pudimos actualizar la disponibilidad del producto.");
-    } finally {
-      setUpdatingProductId(null);
-    }
-  };
+  const handleToggleAvailability = useCallback(
+    async (product: Product) => {
+      if (product.tracks_stock) return;
+      if (!accessToken) return;
+      setUpdatingProductId(product.id);
+      setError(null);
+      try {
+        await apiFetch<Product>(`/api/products/${product.id}/`, {
+          method: "PATCH",
+          token: accessToken ?? undefined,
+          body: { in_stock: !product.in_stock },
+        });
+        await handleRefreshProducts();
+      } catch (err) {
+        console.error(err);
+        setError("No pudimos actualizar la disponibilidad del producto.");
+      } finally {
+        setUpdatingProductId(null);
+      }
+    },
+    [accessToken, handleRefreshProducts]
+  );
+
+  const columns = useMemo<ColumnDef<Product>[]>(
+    () => [
+      columnHelper.display({
+        id: "product",
+        header: () => "Producto",
+        enableResizing: true,
+        size: 260,
+        minSize: 200,
+        cell: ({ row }) => (
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-(--foreground)">
+              {row.original.name}
+            </span>
+            <span className="text-xs text-(--muted-foreground)">
+              {row.original.description || "Sin descripción"}
+            </span>
+          </div>
+        ),
+      }),
+      columnHelper.display({
+        id: "category",
+        header: () => "Categoría",
+        enableResizing: true,
+        size: 160,
+        minSize: 140,
+        cell: ({ row }) => (
+          <span className="text-sm text-(--muted-foreground)">
+            {row.original.category_name}
+          </span>
+        ),
+      }),
+      columnHelper.display({
+        id: "price",
+        header: () => "Precio",
+        enableResizing: true,
+        size: 120,
+        minSize: 110,
+        cell: ({ row }) => {
+          const price = Number(row.original.price);
+          return (
+            <span className="text-sm text-(--muted-foreground)">
+              {`$${price.toFixed(2)}`}
+            </span>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: "state",
+        header: () => "Estado",
+        enableResizing: true,
+        size: 140,
+        minSize: 120,
+        cell: ({ row }) => (
+          <span className="rounded-full bg-(--surface-alt) px-3 py-1 text-xs font-medium text-(--muted-foreground)">
+            {PRODUCT_STATES[
+              row.original.state as keyof typeof PRODUCT_STATES
+            ] ?? row.original.state}
+          </span>
+        ),
+      }),
+      columnHelper.display({
+        id: "stock",
+        header: () => "Stock",
+        enableResizing: true,
+        size: 220,
+        minSize: 200,
+        cell: ({ row }) => {
+          const product = row.original;
+          const isUpdating = updatingProductId === product.id;
+          const tracksStock = product.tracks_stock;
+          const stockStateClass = STOCK_BADGE_CLASSES[product.stock_state];
+          const stockStateLabel = STOCK_STATE_LABELS[product.stock_state];
+
+          return tracksStock ? (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isUpdating || product.stock === 0}
+                  onClick={() => handleStockAdjust(product, -1)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/20 text-xs font-bold text-(--muted-foreground) transition hover:border-(--accent) hover:text-(--accent) disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Restar stock"
+                >
+                  −
+                </button>
+                <span
+                  className={`rounded-full px-3 py-1 text-sm font-semibold ${stockStateClass}`}
+                >
+                  {product.stock}
+                </span>
+                <button
+                  type="button"
+                  disabled={isUpdating}
+                  onClick={() => handleStockAdjust(product, 1)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/20 text-xs font-bold text-(--muted-foreground) transition hover:border-(--accent) hover:text-(--accent) disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Sumar stock"
+                >
+                  +
+                </button>
+              </div>
+              <p className="text-xs text-(--muted-foreground)">
+                Estado: {stockStateLabel}
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  product.in_stock
+                    ? "bg-(--surface-alt) text-(--muted-foreground)"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
+                {product.in_stock ? "Disponible" : "Sin stock"}
+              </span>
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => handleToggleAvailability(product)}
+                className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-(--muted-foreground) transition hover:border-(--accent) hover:text-(--accent) disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {product.in_stock ? "Marcar sin stock" : "Marcar con stock"}
+              </button>
+            </div>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: "actions",
+        header: () => "Acciones",
+        enableResizing: true,
+        size: 180,
+        minSize: 160,
+        cell: ({ row }) => {
+          const product = row.original;
+          const isUpdating = updatingProductId === product.id;
+          return (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => handleEditProduct(product)}
+                className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-(--muted-foreground) transition hover:border-(--accent) hover:text-(--accent)"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => handleToggleActive(product)}
+                className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                  product.is_active
+                    ? "border border-white/20 text-(--muted-foreground) hover:border-(--accent) hover:text-(--accent)"
+                    : "bg-(--accent) text-white hover:bg-(--accent-dark)"
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                {product.is_active ? "Pausar" : "Reactivar"}
+              </button>
+            </div>
+          );
+        },
+      }),
+    ],
+    [
+      handleEditProduct,
+      handleToggleActive,
+      handleStockAdjust,
+      handleToggleAvailability,
+      updatingProductId,
+    ]
+  );
+
+  const table = useReactTable({
+    data: filteredProducts,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    columnResizeMode: "onChange",
+  });
+
+  const tableRows = table.getRowModel().rows;
+  const leafColumnCount = Math.max(table.getAllLeafColumns().length, 1);
 
   if (!user) {
     return (
@@ -1271,151 +1470,91 @@ export default function CatalogPage() {
         </div>
 
         <div ref={productTableRef} className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-(--muted-foreground)">
-              <tr>
-                <th className="pb-3 pr-4">Producto</th>
-                <th className="pb-3 pr-4">Local</th>
-                <th className="pb-3 pr-4">Categoría</th>
-                <th className="pb-3 pr-4">Precio</th>
-                <th className="pb-3 pr-4">Estado</th>
-                <th className="pb-3 pr-4">Stock</th>
-                <th className="pb-3">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {filteredProducts.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="py-8 text-center text-(--muted-foreground)"
-                  >
-                    {stockFilter === "critical"
-                      ? "No hay productos con stock crítico en este momento."
-                      : "Aún no tienes productos cargados en este catálogo."}
-                  </td>
-                </tr>
-              ) : (
-                filteredProducts.map((product) => {
-                  const isUpdating = updatingProductId === product.id;
-                  const tracksStock = product.tracks_stock;
-                  const stockStateClass =
-                    STOCK_BADGE_CLASSES[product.stock_state];
-                  const stockStateLabel =
-                    STOCK_STATE_LABELS[product.stock_state];
-                  return (
-                    <tr key={product.id} className="align-top">
-                      <td className="py-4 pr-4">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-(--foreground)">
-                            {product.name}
-                          </span>
-                          <span className="text-xs text-(--muted-foreground)">
-                            {product.description || "Sin descripción"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-4 pr-4 text-sm text-(--muted-foreground)">
-                        {product.local_name}
-                      </td>
-                      <td className="py-4 pr-4 text-sm text-(--muted-foreground)">
-                        {product.category_name}
-                      </td>
-                      <td className="py-4 pr-4 text-sm text-(--muted-foreground)">
-                        ${Number(product.price).toFixed(2)}
-                      </td>
-                      <td className="py-4 pr-4 text-sm">
-                        <span className="rounded-full bg-(--surface-alt) px-3 py-1 text-xs font-medium text-(--muted-foreground)">
-                          {PRODUCT_STATES[
-                            product.state as keyof typeof PRODUCT_STATES
-                          ] ?? product.state}
-                        </span>
-                      </td>
-                      <td className="py-4 pr-4 text-sm text-(--muted-foreground)">
-                        {tracksStock ? (
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                disabled={isUpdating || product.stock === 0}
-                                onClick={() => handleStockAdjust(product, -1)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/20 text-xs font-bold text-(--muted-foreground) transition hover:border-(--accent) hover:text-(--accent) disabled:cursor-not-allowed disabled:opacity-50"
-                                aria-label="Restar stock"
-                              >
-                                −
-                              </button>
-                              <span
-                                className={`rounded-full px-3 py-1 text-sm font-semibold ${stockStateClass}`}
-                              >
-                                {product.stock}
-                              </span>
-                              <button
-                                type="button"
-                                disabled={isUpdating}
-                                onClick={() => handleStockAdjust(product, 1)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/20 text-xs font-bold text-(--muted-foreground) transition hover:border-(--accent) hover:text-(--accent) disabled:cursor-not-allowed disabled:opacity-50"
-                                aria-label="Sumar stock"
-                              >
-                                +
-                              </button>
-                            </div>
-                            <p className="text-xs text-(--muted-foreground)">
-                              Estado: {stockStateLabel}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                product.in_stock
-                                  ? "bg-(--surface-alt) text-(--muted-foreground)"
-                                  : "bg-red-100 text-red-700"
-                              }`}
-                            >
-                              {product.in_stock ? "Disponible" : "Sin stock"}
+          <div className="inline-block min-w-full align-middle">
+            <table className="min-w-full text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-(--muted-foreground)">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => {
+                      if (header.isPlaceholder) {
+                        return (
+                          <th
+                            key={header.id}
+                            style={{ width: header.getSize() }}
+                            className="pb-3 pr-4"
+                          />
+                        );
+                      }
+                      const paddingClass =
+                        header.column.id === "actions" ? "pb-3" : "pb-3 pr-4";
+                      return (
+                        <th
+                          key={header.id}
+                          style={{ width: header.getSize() }}
+                          className={`relative ${paddingClass}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span>
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
                             </span>
-                            <button
-                              type="button"
-                              disabled={isUpdating}
-                              onClick={() => handleToggleAvailability(product)}
-                              className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-(--muted-foreground) transition hover:border-(--accent) hover:text-(--accent) disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {product.in_stock
-                                ? "Marcar sin stock"
-                                : "Marcar con stock"}
-                            </button>
+                            {header.column.getCanResize() ? (
+                              <span
+                                role="separator"
+                                aria-orientation="vertical"
+                                onMouseDown={header.getResizeHandler()}
+                                onTouchStart={header.getResizeHandler()}
+                                className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none opacity-0 transition hover:opacity-100"
+                              >
+                                <span className="absolute right-0 top-1/2 h-6 w-px -translate-y-1/2 bg-(--accent)" />
+                              </span>
+                            ) : null}
                           </div>
-                        )}
-                      </td>
-                      <td className="py-4 text-sm">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleEditProduct(product)}
-                            className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-(--muted-foreground) transition hover:border-(--accent) hover:text-(--accent)"
+                        </th>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {tableRows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={leafColumnCount}
+                      className="py-8 text-center text-(--muted-foreground)"
+                    >
+                      {stockFilter === "critical"
+                        ? "No hay productos con stock crítico en este momento."
+                        : "Aún no tienes productos cargados en este catálogo."}
+                    </td>
+                  </tr>
+                ) : (
+                  tableRows.map((row) => (
+                    <tr key={row.id} className="align-top">
+                      {row.getVisibleCells().map((cell) => {
+                        const paddingClass =
+                          cell.column.id === "actions" ? "py-4" : "py-4 pr-4";
+                        return (
+                          <td
+                            key={cell.id}
+                            style={{ width: cell.column.getSize() }}
+                            className={paddingClass}
                           >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isUpdating}
-                            onClick={() => handleToggleActive(product)}
-                            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                              product.is_active
-                                ? "border border-white/20 text-(--muted-foreground) hover:border-(--accent) hover:text-(--accent)"
-                                : "bg-(--accent) text-white hover:bg-(--accent-dark)"
-                            } disabled:cursor-not-allowed disabled:opacity-60`}
-                          >
-                            {product.is_active ? "Pausar" : "Reactivar"}
-                          </button>
-                        </div>
-                      </td>
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )}
+                          </td>
+                        );
+                      })}
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </Reveal>
 
