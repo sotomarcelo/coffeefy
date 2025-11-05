@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Reveal } from "@/components/reveal";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -138,6 +138,7 @@ export default function CatalogPage() {
   const [stockFilter, setStockFilter] = useState<"all" | "critical">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"all" | number>("all");
+  const productTableRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!user || !accessToken) {
@@ -269,6 +270,15 @@ export default function CatalogPage() {
     stockFilter === "critical" ||
     categoryFilter !== "all" ||
     searchTerm.trim().length > 0;
+
+  useEffect(() => {
+    if (stockFilter === "critical" && productTableRef.current) {
+      productTableRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [stockFilter]);
 
   useEffect(() => {
     if (!form.tracksStock) return;
@@ -744,7 +754,7 @@ export default function CatalogPage() {
           <p className="text-xs text-(--muted-foreground)">
             {stockFilter === "critical"
               ? "Mostrando solo productos críticos"
-              : "Haz clic para ver detalles del stock crítico"}
+              : "Haz clic para filtrar los productos críticos"}
           </p>
         </button>
       </Reveal>
@@ -1260,7 +1270,7 @@ export default function CatalogPage() {
           ) : null}
         </div>
 
-        <div className="mt-4 overflow-x-auto">
+        <div ref={productTableRef} className="mt-4 overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-(--muted-foreground)">
               <tr>
