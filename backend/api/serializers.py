@@ -88,11 +88,19 @@ class ProductCategorySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ("slug", "created_at", "updated_at")
         extra_kwargs = {
-            "local": {"required": False, "allow_null": True},
+            "local": {"required": False},
         }
 
     def validate(self, attrs):
         local = attrs.get("local", getattr(self.instance, "local", None))
+        if local is None:
+            request = self.context.get("request")
+            if request and request.user.is_authenticated:
+                local = Local.objects.filter(owner=request.user).first()
+                if local is not None:
+                    attrs.setdefault("local", local)
+            if local is None:
+                raise serializers.ValidationError({"local": "Debes asociar la categoría a un local."})
         name = attrs.get("name") or getattr(self.instance, "name", None)
         if not name:
             return attrs

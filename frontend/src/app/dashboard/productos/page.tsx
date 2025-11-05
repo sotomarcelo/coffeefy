@@ -18,8 +18,8 @@ type ProductCategory = {
   name: string;
   slug: string;
   description: string;
-  local: number | null;
-  local_name: string | null;
+  local: number;
+  local_name: string;
   tracks_stock: boolean;
   created_at: string;
   updated_at: string;
@@ -92,8 +92,6 @@ type ProductFormState = {
 type CategoryFormState = {
   name: string;
   tracks_stock: boolean;
-  scopedToLocal: boolean;
-  localId: string;
 };
 
 const EMPTY_FORM: ProductFormState = {
@@ -114,8 +112,6 @@ const EMPTY_FORM: ProductFormState = {
 const EMPTY_CATEGORY_FORM: CategoryFormState = {
   name: "",
   tracks_stock: false,
-  scopedToLocal: true,
-  localId: "",
 };
 
 export default function CatalogPage() {
@@ -140,6 +136,8 @@ export default function CatalogPage() {
   const [editingCategory, setEditingCategory] =
     useState<ProductCategory | null>(null);
   const [stockFilter, setStockFilter] = useState<"all" | "critical">("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | number>("all");
 
   useEffect(() => {
     if (!user || !accessToken) {
@@ -188,20 +186,12 @@ export default function CatalogPage() {
     () => new Set(myLocals.map((local) => local.id)),
     [myLocals]
   );
+  const primaryLocal = myLocals[0] ?? null;
 
   const resetCategoryForm = useCallback(() => {
     setEditingCategory(null);
-    setNewCategory(() => {
-      if (myLocals.length === 0) {
-        return { ...EMPTY_CATEGORY_FORM, scopedToLocal: false };
-      }
-
-      return {
-        ...EMPTY_CATEGORY_FORM,
-        localId: String(myLocals[0].id),
-      };
-    });
-  }, [myLocals]);
+    setNewCategory({ ...EMPTY_CATEGORY_FORM });
+  }, []);
 
   const visibleProducts = useMemo(() => {
     if (myLocalIds.size === 0) return [] as Product[];
@@ -226,9 +216,8 @@ export default function CatalogPage() {
   }, [myLocals]);
 
   const manageableCategories = useMemo(() => {
-    return categories.filter(
-      (category) => category.local === null || myLocalIds.has(category.local)
-    );
+    if (myLocalIds.size === 0) return [] as ProductCategory[];
+    return categories.filter((category) => myLocalIds.has(category.local));
   }, [categories, myLocalIds]);
 
   const totalActive = visibleProducts.filter(
@@ -244,11 +233,42 @@ export default function CatalogPage() {
   );
 
   const filteredProducts = useMemo(() => {
+    let dataset = visibleProducts;
+
     if (stockFilter === "critical") {
-      return criticalProducts;
+      dataset = criticalProducts;
     }
-    return visibleProducts;
-  }, [stockFilter, criticalProducts, visibleProducts]);
+
+    if (categoryFilter !== "all") {
+      dataset = dataset.filter(
+        (product) => product.category === categoryFilter
+      );
+    }
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.trim().toLowerCase();
+      dataset = dataset.filter(
+        (product) =>
+          product.name.toLowerCase().includes(term) ||
+          (product.description ?? "").toLowerCase().includes(term)
+      );
+    }
+
+    return dataset;
+  }, [
+    visibleProducts,
+    criticalProducts,
+    stockFilter,
+    categoryFilter,
+    searchTerm,
+  ]);
+
+  const categoryFilterValue =
+    categoryFilter === "all" ? "all" : String(categoryFilter);
+  const isFiltering =
+    stockFilter === "critical" ||
+    categoryFilter !== "all" ||
+    searchTerm.trim().length > 0;
 
   useEffect(() => {
     if (!form.tracksStock) return;
@@ -334,20 +354,7 @@ export default function CatalogPage() {
     field: T,
     value: CategoryFormState[T]
   ) => {
-    setNewCategory((prev) => {
-      const next = { ...prev, [field]: value };
-
-      if (field === "scopedToLocal") {
-        if (value) {
-          next.localId =
-            prev.localId || (myLocals[0] ? String(myLocals[0].id) : "");
-        } else {
-          next.localId = "";
-        }
-      }
-
-      return next;
-    });
+    setNewCategory((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmitCategory = async (
@@ -365,22 +372,17 @@ export default function CatalogPage() {
       return;
     }
 
+    const primaryLocal = myLocals[0];
+    if (!primaryLocal) {
+      setError("Necesitas registrar un local antes de crear categorías.");
+      return;
+    }
+
     const payload: Record<string, unknown> = {
       name: newCategory.name.trim(),
       tracks_stock: newCategory.tracks_stock,
+      local: editingCategory ? editingCategory.local : primaryLocal.id,
     };
-
-    if (newCategory.scopedToLocal) {
-      if (!newCategory.localId) {
-        setError(
-          "Selecciona un local antes de crear una categoría solo para él."
-        );
-        return;
-      }
-      payload.local = Number(newCategory.localId);
-    } else if (editingCategory && editingCategory.local !== null) {
-      payload.local = null;
-    }
 
     setCategorySaving(true);
     setError(null);
@@ -416,9 +418,6 @@ export default function CatalogPage() {
         setForm((prev) => ({
           ...prev,
           categoryId: String(category.id),
-          ...(newCategory.localId
-            ? { localId: String(newCategory.localId) }
-            : {}),
         }));
       }
 
@@ -447,8 +446,6 @@ export default function CatalogPage() {
     setNewCategory({
       name: category.name,
       tracks_stock: category.tracks_stock,
-      scopedToLocal: category.local !== null,
-      localId: category.local ? String(category.local) : "",
     });
   };
 
@@ -716,13 +713,15 @@ export default function CatalogPage() {
         </div>
         <div className="rounded-3xl border border-white/15 bg-(--surface) p-6 shadow-(--shadow-card)">
           <p className="text-xs uppercase tracking-wide text-(--muted-foreground)">
-            Locales operativos
+            Tu local
           </p>
-          <p className="mt-2 text-3xl font-semibold text-(--foreground)">
-            {myLocals.length}
+          <p className="mt-2 text-2xl font-semibold text-(--foreground)">
+            {primaryLocal?.name ?? "Sin nombre"}
           </p>
           <p className="text-xs text-(--muted-foreground)">
-            {myLocals.map((local) => local.name).join(", ")}
+            {primaryLocal?.type
+              ? `Tipo: ${primaryLocal.type}`
+              : "Gestionas un único local"}
           </p>
         </div>
         <button
@@ -812,7 +811,9 @@ export default function CatalogPage() {
               </h3>
               {editingCategory ? (
                 <span className="text-xs text-(--muted-foreground)">
-                  {editingCategory.local_name ?? "Global"}
+                  {editingCategory.local_name ||
+                    myLocals[0]?.name ||
+                    "Sin local"}
                 </span>
               ) : null}
             </div>
@@ -845,50 +846,6 @@ export default function CatalogPage() {
                 Seguir stock para esta categoría
               </label>
             </div>
-
-            <label className="flex items-center gap-2 text-sm font-semibold text-(--foreground)">
-              <input
-                type="checkbox"
-                checked={newCategory.scopedToLocal}
-                onChange={(event) =>
-                  handleCategoryFormChange(
-                    "scopedToLocal",
-                    event.target.checked
-                  )
-                }
-                disabled={myLocals.length === 0}
-                className="h-4 w-4 rounded border-white/40 bg-(--surface) text-(--accent) focus:ring-(--accent) disabled:cursor-not-allowed disabled:opacity-50"
-              />
-              Disponible solo para el local seleccionado
-            </label>
-
-            {myLocals.length === 0 ? (
-              <p className="text-xs text-(--muted-foreground)">
-                Crea un local primero para habilitar categorías limitadas a un
-                local.
-              </p>
-            ) : null}
-
-            {newCategory.scopedToLocal ? (
-              <label className="text-sm font-semibold text-(--foreground)">
-                Local para la categoría
-                <select
-                  value={newCategory.localId}
-                  onChange={(event) =>
-                    handleCategoryFormChange("localId", event.target.value)
-                  }
-                  className="mt-1 w-full rounded-xl border border-white/40 bg-(--surface) px-4 py-3 text-sm text-(--foreground) shadow-sm focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30"
-                  required
-                >
-                  <option value="">Selecciona uno</option>
-                  {myLocals.map((local) => (
-                    <option key={local.id} value={local.id}>
-                      {local.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
 
             <div className="flex justify-end gap-3">
               <button
@@ -1173,11 +1130,15 @@ export default function CatalogPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               {manageableCategories.map((category) => {
                 const isEditing = editingCategory?.id === category.id;
+                const isActiveFilter =
+                  categoryFilter !== "all" && categoryFilter === category.id;
                 return (
                   <div
                     key={category.id}
                     className={`flex items-start justify-between gap-4 rounded-2xl border px-4 py-3 text-sm shadow-(--shadow-card) ${
                       isEditing
+                        ? "border-(--accent) bg-(--surface-alt)"
+                        : isActiveFilter
                         ? "border-(--accent) bg-(--surface-alt)"
                         : "border-white/12 bg-(--surface-alt)"
                     }`}
@@ -1187,13 +1148,30 @@ export default function CatalogPage() {
                         {category.name}
                       </p>
                       <p className="text-xs uppercase tracking-wide text-(--muted-foreground)">
-                        {category.local_name ?? "Global"}
+                        {category.local_name ||
+                          myLocals[0]?.name ||
+                          "Sin local"}
                       </p>
                       <p className="text-xs text-(--muted-foreground)">
                         {category.tracks_stock
                           ? "Sigue stock"
                           : "Sin seguimiento"}
                       </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCategoryFilter((current) =>
+                            current === category.id ? "all" : category.id
+                          )
+                        }
+                        className={`mt-2 inline-flex w-fit items-center justify-center rounded-full px-3 py-1 text-xs font-semibold transition ${
+                          isActiveFilter
+                            ? "bg-(--accent) text-white"
+                            : "border border-white/25 text-(--muted-foreground) hover:border-(--accent) hover:text-(--accent)"
+                        }`}
+                      >
+                        {isActiveFilter ? "Ver todas" : "Ver productos"}
+                      </button>
                     </div>
                     <button
                       type="button"
@@ -1230,6 +1208,56 @@ export default function CatalogPage() {
               Recargar productos
             </button>
           </div>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+            <label htmlFor="products-search" className="sr-only">
+              Buscar productos
+            </label>
+            <input
+              id="products-search"
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Buscar por nombre o descripción"
+              className="w-full flex-1 rounded-full border border-white/20 bg-(--surface) px-4 py-2 text-sm text-(--foreground) shadow-sm focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/40"
+            />
+            <div className="sm:w-60">
+              <label htmlFor="category-filter" className="sr-only">
+                Filtrar por categoría
+              </label>
+              <select
+                id="category-filter"
+                value={categoryFilterValue}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setCategoryFilter(value === "all" ? "all" : Number(value));
+                }}
+                className="w-full rounded-full border border-white/20 bg-(--surface) px-4 py-2 text-sm text-(--foreground) shadow-sm focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/40"
+              >
+                <option value="all">Todas las categorías</option>
+                {manageableCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {isFiltering ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm("");
+                setCategoryFilter("all");
+                setStockFilter("all");
+              }}
+              className="self-start rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-(--muted-foreground) transition hover:border-(--accent) hover:text-(--accent)"
+            >
+              Limpiar filtros
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-4 overflow-x-auto">

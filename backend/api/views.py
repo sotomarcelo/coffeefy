@@ -153,20 +153,15 @@ class ProductCategoryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         local_id = self.request.query_params.get("local")
-        include_global = self.request.query_params.get("include_global", "true").lower() != "false"
 
         if local_id:
-            filters = Q(local_id=local_id)
-            if include_global:
-                filters = filters | Q(local__isnull=True)
-            queryset = queryset.filter(filters)
-        elif self.request.user.is_authenticated:
-            user_local_ids = Local.objects.filter(owner=self.request.user).values_list("id", flat=True)
-            queryset = queryset.filter(Q(local__isnull=True) | Q(local_id__in=user_local_ids))
-        else:
-            queryset = queryset.filter(local__isnull=True)
+            return queryset.filter(local_id=local_id)
 
-        return queryset
+        if self.request.user.is_authenticated:
+            user_local_ids = Local.objects.filter(owner=self.request.user).values_list("id", flat=True)
+            return queryset.filter(local_id__in=user_local_ids)
+
+        return queryset.none()
 
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):

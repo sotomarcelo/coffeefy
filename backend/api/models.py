@@ -47,6 +47,9 @@ class Local(models.Model):
     class Meta:
         verbose_name = "Local"
         verbose_name_plural = "Locales"
+        constraints = [
+            models.UniqueConstraint(fields=["owner"], name="unique_local_per_owner"),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_type_display()})"
@@ -60,8 +63,6 @@ class ProductCategory(models.Model):
         Local,
         on_delete=models.CASCADE,
         related_name="categories",
-        blank=True,
-        null=True,
     )
     tracks_stock = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -72,8 +73,7 @@ class ProductCategory(models.Model):
         unique_together = ("local", "slug")
 
     def __str__(self):
-        scope = self.local.name if self.local else "Global"
-        return f"{self.name} ({scope})"
+        return f"{self.name} ({self.local.name})"
 
     def save(self, *args, **kwargs):
         if not self.slug:
