@@ -1,0 +1,46 @@
+# --- Framework base ---
+Django==5.1.1
+djangorestframework==3.15.2
+django-filter==24.3
+
+# --- Autenticación y seguridad ---
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.4.0
+django-environ==0.11.2
+bcrypt==4.2.0
+
+# --- Base de datos ---
+psycopg2-binary==2.9.9        # PostgreSQL
+dj-database-url==2.2.0
+
+# --- Panel de administración ---
+django-jazzmin==3.0.0          # Admin UI moderno
+django-admin-interface==0.28.8 # (opcional, más personalización visual)
+django-colorfield==0.11.0      # Campos de color personalizados en admin
+
+# --- Archivos estáticos y multimedia ---
+Pillow==11.0.0                 # Manejo de imágenes
+django-storages==1.14.3
+boto3==1.35.23                 # AWS S3 o DigitalOcean Spaces (si usas nube)
+
+# --- Utilidades y mejoras ---
+drf-spectacular==0.27.2        # Documentación automática Swagger/OpenAPI
+python-decouple==3.8           # Variables de entorno
+requests==2.32.3
+gunicorn==23.0.0               # Servidor WSGI para despliegue
+whitenoise==6.7.0              # Servir archivos estáticos
+
+# --- Opcional: rendimiento / async ---
+uvicorn==0.31.0                # Si usas ASGI
+channels==4.1.0                # WebSockets (opcional futuro)
+redis==5.1.1                   # Cache o cola de tareas
+
+# --- Testing ---
+pytest==8.3.3
+pytest-django==4.8.0
+factory-boy==3.3.1
+
+# --- Linter / Formato (recomendado para desarrollo) ---
+black==24.10.0
+flake8==7.1.1
+isort==5.13.2
